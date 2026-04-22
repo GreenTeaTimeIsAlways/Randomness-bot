@@ -88,11 +88,23 @@ export function truncate(text, limit) {
   if (typeof text !== "string") {
     return "";
   }
-  if (text.length <= limit) {
+
+  const safeLimit = Math.max(0, Number(limit) || 0);
+  if (safeLimit === 0) {
+    return "";
+  }
+
+  if (text.length <= safeLimit) {
     return text;
   }
-  return `${text.slice(0, limit - 1).trimEnd()}...`;
+
+  if (safeLimit <= 3) {
+    return ".".repeat(safeLimit);
+  }
+
+  return `${text.slice(0, safeLimit - 3).trimEnd()}...`;
 }
+
 
 export function safeJsonParse(value, fallback = null) {
   try {
