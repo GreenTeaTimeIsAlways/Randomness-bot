@@ -63,13 +63,6 @@ export function pickRandom(items) {
   if (!Array.isArray(items) || items.length === 0) {
     throw new Error("Nie mozna losowac z pustej listy.");
   }
-export function randomIntInclusive(min, max) {
-  const lower = Math.ceil(Math.min(min, max));
-  const upper = Math.floor(Math.max(min, max));
-  const random = new Uint32Array(1);
-  crypto.getRandomValues(random);
-  return lower + (random[0] % (upper - lower + 1));
-}
 
   const random = new Uint32Array(1);
   crypto.getRandomValues(random);
