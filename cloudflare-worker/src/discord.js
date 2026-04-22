@@ -242,8 +242,16 @@ export function getCommandOptionValue(interaction, optionName) {
 }
 
 function walkComponentValues(components, map) {
-  for (const row of components || []) {
-    for (const component of row.components || []) {
+  for (const item of components || []) {
+    if (item?.component && item.component.custom_id) {
+      const nestedValue = item.component.value;
+      if (typeof nestedValue === "string") {
+        map.set(item.component.custom_id, nestedValue);
+      }
+      continue;
+    }
+
+    for (const component of item?.components || []) {
       if (component.custom_id && typeof component.value === "string") {
         map.set(component.custom_id, component.value);
       }
@@ -251,18 +259,28 @@ function walkComponentValues(components, map) {
   }
 }
 
+
 export function getModalFieldValue(interaction, fieldId) {
   const values = new Map();
   walkComponentValues(interaction?.data?.components || [], values);
   return String(values.get(fieldId) || "");
 }
-
 export function buildActionRow(component) {
   return {
     type: 1,
     components: [component],
   };
 }
+
+export function buildModalLabel({ label, description, component }) {
+  return {
+    type: 18,
+    label,
+    description,
+    component,
+  };
+}
+
 
 export function buildButton({ customId, label, style = 1 }) {
   return {
@@ -282,14 +300,23 @@ export function buildTextInput({
   style = 2,
   required = true,
 }) {
-  return {
+  const payload = {
     type: 4,
     custom_id: customId,
-    label,
-    placeholder,
     min_length: minLength,
     max_length: maxLength,
     style,
     required,
   };
+
+  if (label) {
+    payload.label = label;
+  }
+
+  if (placeholder) {
+    payload.placeholder = placeholder;
+  }
+
+  return payload;
 }
+
