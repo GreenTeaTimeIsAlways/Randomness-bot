@@ -1,0 +1,33 @@
+name = "discord-verification-worker"
+main = "cloudflare-worker/src/index.js"
+compatibility_date = "2026-04-22"
+
+[observability]
+enabled = true
+
+[triggers]
+crons = ["*/15 * * * *"]
+
+[vars]
+ENABLE_VERIFICATION = "true"
+ENABLE_MONTHLY_EVENTS = "true"
+RESET_TIMEZONE = "Europe/Warsaw"
+GEMINI_MODEL = "gemini-2.5-flash-lite"
+PASSING_SCORE = "72"
+SECOND_CHANCE_SCORE = "55"
+MIN_QUESTION_SCORE = "35"
+MAX_ATTEMPTS = "2"
+COOLDOWN_MINUTES = "30"
+ACTIVE_SESSION_TTL_MINUTES = "120"
+DAILY_VERIFICATION_LIMIT = "25"
+REFLEX_MIN_SECONDS = "10"
+REFLEX_MAX_SECONDS = "15"
+MONTHLY_EVENT_COUNT = "12"
+EVENT_POST_HOUR_LOCAL = "18"
+KICK_ON_FAILURE = "true"
+ENABLED_VERIFICATION_MODES = "knowledge,absurd,bluff,reflex,paradox"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "discord-verification-db"
+database_id = "46454dcd-2bc5-4c42-8d0f-ac166f98763c"
