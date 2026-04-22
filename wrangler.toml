@@ -25,3 +25,8 @@ REFLEX_MAX_SECONDS = "15"
 MONTHLY_EVENT_COUNT = "12"
 EVENT_POST_HOUR_LOCAL = "18"
 ENABLED_VERIFICATION_MODES = "knowledge,absurd,bluff,reflex,paradox"
+[[d1_databases]]
+binding = "DB"
+database_name = "discord-verification-db"
+database_id = "46454dcd-2bc5-4c42-8d0f-ac166f98763c"
+
