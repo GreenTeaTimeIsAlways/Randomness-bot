@@ -2,6 +2,7 @@ import {
   addGuildMemberRole,
   buildActionRow,
   buildButton,
+  buildModalLabel,
   buildTextInput,
   createEphemeralMessageResponse,
   createModalResponse,
@@ -188,36 +189,43 @@ function buildInterestModal() {
     custom_id: INTEREST_MODAL_ID,
     title: "Pytanie 1 z 4",
     components: [
-      buildActionRow(
-        buildTextInput({
+      buildModalLabel({
+        label: "Czym sie interesujesz?",
+        description: "To pytanie ustala klimat kolejnych 3 pytan.",
+        component: buildTextInput({
           customId: "interest",
-          label: "Czym sie interesujesz?",
           placeholder: "Np. muzyka, gry, fotografia, historia, programowanie...",
           minLength: 3,
           maxLength: 250,
         }),
-      ),
+      }),
     ],
   };
 }
 
 function buildAnswersModal(session) {
+  const isBluff = session.challenge.mode === "bluff";
+  const isReflex = session.challenge.mode === "reflex";
+
   return {
     custom_id: `verification:answers:${session.sessionId}`,
-    title: truncate(session.challenge.modeLabel, 45),
+    title: "Formularz odpowiedzi",
     components: session.challenge.questions.map((question, index) =>
-      buildActionRow(
-        buildTextInput({
+      buildModalLabel({
+        label: truncate(question.prompt, 45),
+        description: truncate(question.scoringFocus, 100),
+        component: buildTextInput({
           customId: `answer_${index + 1}`,
-          label: `Odpowiedz ${index + 1}`,
-          placeholder:
-            session.challenge.mode === "bluff"
-              ? "Wpisz A, B albo C"
-              : truncate(question.prompt, 100),
+          placeholder: isBluff
+            ? "Wpisz A, B albo C"
+            : isReflex
+              ? "Krotka odpowiedz, najlepiej 1-5 slow"
+              : "Wpisz swoja odpowiedz",
           minLength: 1,
-          maxLength: session.challenge.mode === "bluff" ? 3 : session.challenge.mode === "reflex" ? 120 : 1200,
+          maxLength: isBluff ? 3 : isReflex ? 120 : 1200,
+          style: isBluff || isReflex ? 1 : 2,
         }),
-      ),
+      }),
     ),
   };
 }
