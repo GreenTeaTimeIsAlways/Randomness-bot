@@ -212,8 +212,8 @@ function buildAnswersModal(session) {
     title: "Formularz odpowiedzi",
     components: session.challenge.questions.map((question, index) =>
       buildModalLabel({
-        label: truncate(question.prompt, 45),
-        description: truncate(question.scoringFocus, 100),
+        label: `Pytanie ${index + 1}`,
+        description: truncate(question.prompt, 100),
         component: buildTextInput({
           customId: `answer_${index + 1}`,
           placeholder: isBluff
@@ -229,6 +229,7 @@ function buildAnswersModal(session) {
     ),
   };
 }
+
 
 export function buildVerificationPanelPayload() {
   return {
