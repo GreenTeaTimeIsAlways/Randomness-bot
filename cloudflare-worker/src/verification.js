@@ -507,7 +507,7 @@ export function buildVerificationPanelPayload() {
           {
             name: "Mozliwe tryby",
             value:
-              "- wiedzy\n- absurdu\n- blefu\n- refleksu\n- paradoksu\n\nDobra odpowiedz wpuszcza od razu, srednia daje druga szanse.",
+              "- wiedzy\n- absurdu\n- blefu\n- paradoksu\n\nDobra odpowiedz wpuszcza od razu, srednia daje druga szanse.",
           },
         ],
         footer: {
