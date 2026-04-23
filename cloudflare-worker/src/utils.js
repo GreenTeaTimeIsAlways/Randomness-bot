@@ -167,9 +167,18 @@ export function dateFromMonthAndDay(monthKey, dayNumber) {
   return `${year}-${String(month).padStart(2, "0")}-${String(dayNumber).padStart(2, "0")}`;
 }
 
-export function isWithinPostingWindow(date, timeZone, targetHour, windowMinutes = 15) {
+export function hasReachedPostingTime(date, timeZone, targetHour, targetMinute = 0) {
   const parts = getZonedDateParts(date, timeZone);
-  return parts.hour === targetHour && parts.minute < windowMinutes;
+  const currentMinutes = parts.hour * 60 + parts.minute;
+  const targetMinutes = targetHour * 60 + targetMinute;
+  return currentMinutes >= targetMinutes;
+}
+
+export function isWithinPostingWindow(date, timeZone, targetHour, targetMinute = 0, windowMinutes = 15) {
+  const parts = getZonedDateParts(date, timeZone);
+  const currentMinutes = parts.hour * 60 + parts.minute;
+  const targetMinutes = targetHour * 60 + targetMinute;
+  return currentMinutes >= targetMinutes && currentMinutes < targetMinutes + windowMinutes;
 }
 
 export function diffMinutesFromNow(isoString) {
