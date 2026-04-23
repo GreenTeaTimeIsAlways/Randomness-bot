@@ -26,7 +26,7 @@ MONTHLY_EVENT_COUNT = "31"
 EVENT_POST_HOUR_LOCAL = "9"
 EVENT_POST_MINUTE_LOCAL = "0"
 KICK_ON_FAILURE = "true"
-ENABLED_VERIFICATION_MODES = "knowledge,absurd,bluff,reflex,paradox"
+ENABLED_VERIFICATION_MODES = "knowledge,absurd,bluff,paradox"
 
 [[d1_databases]]
 binding = "DB"
