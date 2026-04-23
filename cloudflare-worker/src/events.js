@@ -1,12 +1,11 @@
 import { postChannelMessage } from "./discord.js";
 import { getMonthlyEventCount, getPendingEventsForDate, markEventPosted, replaceMonthlyEvents } from "./db.js";
-import { describeGeminiError, generateMonthlyEventsWithGemini } from "./gemini.js";
 import {
   dateFromMonthAndDay,
   getDaysInMonth,
+  hasReachedPostingTime,
   getLocalDayKey,
   getLocalMonthKey,
-  isWithinPostingWindow,
   nowIso,
 } from "./utils.js";
 
@@ -15,6 +14,122 @@ const EVENT_KIND_LABELS = {
   glitch_event: "Glitch event",
   pattern_hunt: "Polowanie na wzor",
 };
+
+const QUESTION_EVENTS = [
+  {
+    title: "Pytanie z innej szuflady",
+    body:
+      "Dzisiejsza ruletka: opisz rzecz, ktora wydaje sie zwyczajna, ale wedlug Ciebie ma ukryty klimat albo dziwna magie.",
+    cta: "Wrzuc jedna odpowiedz i zobacz, kto pojdzie w najbardziej nieoczywista strone.",
+  },
+  {
+    title: "Mini teoria dnia",
+    body:
+      "Wybierz dowolny przedmiot z pokoju i wymysl teorie, dlaczego moglby byc centrum tajnego uniwersum.",
+    cta: "Najlepsza teoria to ta, ktora brzmi absurdalnie, ale prawie da sie w nia uwierzyc.",
+  },
+  {
+    title: "Losowy zwrot akcji",
+    body:
+      "Napisz jedno zdanie, ktore zaczyna sie normalnie, ale konczy tak, jakby narracja nagle skrecila w bok.",
+    cta: "Niech kazdy dorzuci swoj zwrot akcji pod ta wiadomoscia.",
+  },
+  {
+    title: "Mapa skojarzen",
+    body:
+      "Podaj 3 slowa, ktore kompletnie do siebie nie pasuja, a potem wyjasnij w jednym zdaniu, co je laczy.",
+    cta: "Im dziwniejszy most miedzy slowami, tym lepiej.",
+  },
+];
+
+const GLITCH_EVENTS = [
+  {
+    title: "Zaklocenie sygnalu",
+    body:
+      "SYSTEM//GLITCH: `papier -> echo -> latarnia -> papier -> echo -> ?` Bot udaje, ze to przypadek. Czy na pewno?",
+    cta: "Dopisz brakujacy element albo wytlumacz, czemu schemat klamie.",
+  },
+  {
+    title: "Zgubiony komunikat",
+    body:
+      "ALERT: znaleziono wiadomosc bez nadawcy: `Nie ufaj trzeciemu kolorowi, chyba ze pierwszy milczy.`",
+    cta: "Napisz, co to moze znaczyc. Najbardziej spojna interpretacja wygrywa respekt.",
+  },
+  {
+    title: "Bot mowi bokiem",
+    body:
+      "BZZT. Dzisiejszy kod brzmi: `KSIEZYC / KLUCZ / KROK / KSIEZYC / KLUCZ / ...`",
+    cta: "Znajdz rytm, kontynuacje albo najlepsza absurdalna teorie.",
+  },
+  {
+    title: "Nieplanowany blad",
+    body:
+      "Komunikat serwera: `Jesli widzisz ten tekst, to znaczy, ze przypadek probuje cos powiedziec.`",
+    cta: "Odpowiedz jednym zdaniem, co przypadek mial na mysli.",
+  },
+];
+
+const PATTERN_EVENTS = [
+  {
+    title: "Polowanie na rytm",
+    body:
+      "Chaos dnia: `2, 4, 8, 16, 15, 30, 60`. Gdzies tu jest regula, ale cos peklo po drodze.",
+    cta: "Wskaz wzor albo moment, w ktorym schemat zaczyna udawac.",
+  },
+  {
+    title: "Gra w kolory",
+    body:
+      "Sekwencja: `zielony, niebieski, zielony, czerwony, zielony, niebieski, ?`. To moze byc rytm, zart albo pulapka.",
+    cta: "Podaj nastepny element i uzasadnij swoja logike.",
+  },
+  {
+    title: "Ukryty algorytm",
+    body:
+      "Masz zestaw: `kot, most, 7, kot, most, 14, kot, most, ?`. Znajdz brakujacy element albo obron inna wersje.",
+    cta: "Liczy sie nie tylko odpowiedz, ale tez sposob myslenia.",
+  },
+  {
+    title: "Nierowny wzor",
+    body:
+      "Dzisiejszy schemat: `A1, B2, C3, E5, H8`. Czy to blad, skok, czy ukryta zasada?",
+    cta: "Napisz hipoteze w 2-4 zdaniach.",
+  },
+];
+
+function getDistributedDays(daysInMonth, desiredCount) {
+  if (desiredCount >= daysInMonth) {
+    return Array.from({ length: daysInMonth }, (_, index) => index + 1);
+  }
+
+  const days = [];
+  const used = new Set();
+  for (let index = 0; index < desiredCount; index += 1) {
+    let day = Math.round(((index + 0.5) * daysInMonth) / desiredCount);
+    day = Math.min(daysInMonth, Math.max(1, day));
+
+    while (used.has(day) && day < daysInMonth) {
+      day += 1;
+    }
+    while (used.has(day) && day > 1) {
+      day -= 1;
+    }
+
+    used.add(day);
+    days.push(day);
+  }
+
+  return days.sort((left, right) => left - right);
+}
+
+function pickTemplate(kind, day, index) {
+  if (kind === "question_roulette") {
+    return QUESTION_EVENTS[(day + index) % QUESTION_EVENTS.length];
+  }
+  if (kind === "glitch_event") {
+    return GLITCH_EVENTS[(day + index) % GLITCH_EVENTS.length];
+  }
+  return PATTERN_EVENTS[(day + index) % PATTERN_EVENTS.length];
+}
 
 function normalizeEventItem(item, monthKey, daysInMonth) {
   const day = Number(item?.day);
@@ -58,89 +173,37 @@ function deduplicateAndSort(items, monthKey, daysInMonth, desiredCount) {
 }
 
 function buildFallbackItems(monthKey, daysInMonth, desiredCount) {
-  const usedDays = new Set();
-  const fallbackItems = [];
   const kinds = ["question_roulette", "glitch_event", "pattern_hunt"];
-
-  while (fallbackItems.length < desiredCount) {
-    const day = Math.floor(Math.random() * daysInMonth) + 1;
-    if (usedDays.has(day)) {
-      continue;
-    }
-    usedDays.add(day);
-
-    const kind = kinds[fallbackItems.length % kinds.length];
-    if (kind === "question_roulette") {
-      fallbackItems.push({
-        day,
-        kind,
-        title: "Ruletka pytan",
-        body:
-          "Dzisiejszy temat: opowiedz o czyms, co ostatnio Cie zaskoczylo, nauczylo albo kompletnie rozwalilo Ci schemat myslenia.",
-        cta: "Wrzuc 1 odpowiedz pod ta wiadomoscia i zobacz, co napisza inni.",
-        eventDate: dateFromMonthAndDay(monthKey, day),
-      });
-    } else if (kind === "glitch_event") {
-      fallbackItems.push({
-        day,
-        kind,
-        title: "Glitch event",
-        body:
-          "SYSTEM//BLAD? Oto komunikat: `KOT | LASER | DESZCZ | KOT | LASER | ?` Znajdz rytm albo dopisz najbardziej sensowna kontynuacje.",
-        cta: "Kto pierwszy odkryje logike albo stworzy najlepsza teorie, wygrywa chwalebny respekt.",
-        eventDate: dateFromMonthAndDay(monthKey, day),
-      });
-    } else {
-      fallbackItems.push({
-        day,
-        kind,
-        title: "Polowanie na wzor",
-        body:
-          "Chaos na dzis: `3, 6, 12, 24, 21, 42, 84`. Jest tu ukryta regula, ale cos tez nie gra. Znajdz wzor albo wskaz moment, gdzie wszystko sie sypie.",
-        cta: "Napisz swoja hipoteze i uzasadnij ja w 2-4 zdaniach.",
-        eventDate: dateFromMonthAndDay(monthKey, day),
-      });
-    }
-  }
-
-  return fallbackItems.sort((left, right) => left.day - right.day);
+  return getDistributedDays(daysInMonth, desiredCount).map((day, index) => {
+    const kind = kinds[index % kinds.length];
+    const template = pickTemplate(kind, day, index);
+    return {
+      day,
+      kind,
+      title: template.title,
+      body: template.body,
+      cta: template.cta,
+      eventDate: dateFromMonthAndDay(monthKey, day),
+    };
+  });
 }
 
 async function buildMonthlyPlan(config, monthKey) {
   const daysInMonth = getDaysInMonth(monthKey);
-
-  try {
-    const rawPlan = await generateMonthlyEventsWithGemini(
-      config,
-      monthKey,
-      daysInMonth,
-      config.monthlyEventCount,
-    );
-    const rawItems = Array.isArray(rawPlan?.items) ? rawPlan.items : [];
-    const normalized = deduplicateAndSort(rawItems, monthKey, daysInMonth, config.monthlyEventCount);
-    if (normalized.length === config.monthlyEventCount) {
-      return {
-        overview: String(rawPlan?.overview || "").trim(),
-        items: normalized,
-        source: "gemini",
-      };
-    }
-  } catch (error) {
-    console.error("Nie udalo sie wygenerowac planu eventow przez Gemini:", error);
-    console.error(describeGeminiError(error));
-  }
+  const desiredCount = Math.min(config.monthlyEventCount, daysInMonth);
 
   return {
-    overview: "Plan awaryjny wygenerowany lokalnie.",
-    items: buildFallbackItems(monthKey, daysInMonth, config.monthlyEventCount),
-    source: "fallback",
+    overview: "Plan eventow wygenerowany lokalnie, bez ciezkiego zapytania do AI.",
+    items: buildFallbackItems(monthKey, daysInMonth, desiredCount),
+    source: "local",
   };
 }
 
 export async function ensureMonthlyPlan(env, config, currentDate = new Date()) {
   const monthKey = getLocalMonthKey(currentDate, config.resetTimezone);
+  const desiredCount = Math.min(config.monthlyEventCount, getDaysInMonth(monthKey));
   const existingCount = await getMonthlyEventCount(env, monthKey);
-  if (existingCount >= config.monthlyEventCount) {
+  if (existingCount >= desiredCount) {
     return {
       monthKey,
       created: false,
@@ -176,8 +239,16 @@ function buildEventMessage(item) {
 }
 
 export async function postTodayEventsIfNeeded(env, config, currentDate = new Date(), force = false) {
-  if (!force && !isWithinPostingWindow(currentDate, config.resetTimezone, config.eventPostHourLocal, 15)) {
-    return { posted: 0, reason: "outside_window" };
+  if (
+    !force &&
+    !hasReachedPostingTime(
+      currentDate,
+      config.resetTimezone,
+      config.eventPostHourLocal,
+      config.eventPostMinuteLocal,
+    )
+  ) {
+    return { posted: 0, reason: "before_post_time" };
   }
 
   const dayKey = getLocalDayKey(currentDate, config.resetTimezone);
