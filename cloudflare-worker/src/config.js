@@ -1,6 +1,6 @@
 import { clamp, splitCsv, toBool, toInt } from "./utils.js";
 
-const DEFAULT_MODES = ["knowledge", "absurd", "bluff", "reflex", "paradox"];
+const DEFAULT_MODES = ["knowledge", "absurd", "bluff", "paradox"];
 const SUPPORTED_MODES = new Set(DEFAULT_MODES);
 
 export function readConfig(env) {
