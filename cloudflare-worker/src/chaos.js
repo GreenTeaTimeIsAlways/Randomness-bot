@@ -334,8 +334,6 @@ function buildPromptBody(category, seed) {
   if (category === "prophecy") {
     return [
       `Przepowiednia nr ${seed.number}: gdy **${seed.object}** trafi do miejsca **${seed.place}**, **${seed.character}** odkryje, ze **${seed.problem}**.`,
-      `Cena przepowiedni: **${seed.rule}**.`,
-      `Zadanie: ${seed.task}.`,
     ];
   }
 
