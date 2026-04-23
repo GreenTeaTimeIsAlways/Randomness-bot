@@ -157,11 +157,12 @@ function buildVerificationHistoryMessage(config, attempts, userId = "") {
 }
 
 function buildEventStatusMessage(config, monthKey, dayKey, scheduledCount, upcomingEvents) {
+  const postMinute = String(config.eventPostMinuteLocal).padStart(2, "0");
   const lines = [
     "**Status eventow**",
     `Kanal eventow: ${config.eventChannelId ? `<#${config.eventChannelId}>` : "brak ustawionego kanalu"}`,
     `Strefa czasowa: **${config.resetTimezone}**`,
-    `Godzina publikacji: **${config.eventPostHourLocal}:00**`,
+    `Publikacja: **po ${config.eventPostHourLocal}:${postMinute}** przy najblizszym sprawdzeniu crona`,
     `Zaplanowane eventy w miesiacu ${monthKey}: **${scheduledCount}**`,
     `Dzisiaj: **${dayKey}**`,
     "",
