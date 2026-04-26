@@ -239,6 +239,8 @@ function buildEventMessage(item) {
 }
 
 export async function postTodayEventsIfNeeded(env, config, currentDate = new Date(), force = false) {
+  const dayKey = getLocalDayKey(currentDate, config.resetTimezone);
+
   if (
     !force &&
     !hasReachedPostingTime(
@@ -248,13 +250,12 @@ export async function postTodayEventsIfNeeded(env, config, currentDate = new Dat
       config.eventPostMinuteLocal,
     )
   ) {
-    return { posted: 0, reason: "before_post_time" };
+    return { posted: 0, reason: "before_post_time", dayKey };
   }
 
-  const dayKey = getLocalDayKey(currentDate, config.resetTimezone);
   const pending = await getPendingEventsForDate(env, dayKey);
   if (pending.length === 0) {
-    return { posted: 0, reason: "no_event" };
+    return { posted: 0, reason: "no_event", dayKey };
   }
 
   let posted = 0;
@@ -265,4 +266,36 @@ export async function postTodayEventsIfNeeded(env, config, currentDate = new Dat
   }
 
   return { posted, reason: "posted", dayKey };
+}
+
+export async function runMonthlyEventAutomation(env, config, options = {}) {
+  const currentDate = options.currentDate || new Date();
+  const source = options.source || "cron";
+  const scheduledAt = options.scheduledAt || null;
+  const dayKey = getLocalDayKey(currentDate, config.resetTimezone);
+  const monthKey = getLocalMonthKey(currentDate, config.resetTimezone);
+
+  const plan = await ensureMonthlyPlan(env, config, currentDate);
+  const postResult = await postTodayEventsIfNeeded(env, config, currentDate, false);
+
+  console.log(
+    JSON.stringify({
+      message: "monthly_event_automation",
+      source,
+      scheduledAt,
+      checkedAt: currentDate.toISOString(),
+      timezone: config.resetTimezone,
+      dayKey,
+      monthKey,
+      postTime: `${String(config.eventPostHourLocal).padStart(2, "0")}:${String(
+        config.eventPostMinuteLocal,
+      ).padStart(2, "0")}`,
+      planCreated: plan.created,
+      plannedCount: plan.count,
+      posted: postResult.posted,
+      reason: postResult.reason,
+    }),
+  );
+
+  return { plan, postResult };
 }

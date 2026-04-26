@@ -21,7 +21,7 @@ import {
   listVerificationAttemptsForUser,
   resetUserState,
 } from "./db.js";
-import { ensureMonthlyPlan, postTodayEventsIfNeeded } from "./events.js";
+import { ensureMonthlyPlan, postTodayEventsIfNeeded, runMonthlyEventAutomation } from "./events.js";
 import {
   buildVerificationPanelPayload,
   handleOpenAnswers,
@@ -570,10 +570,14 @@ export default {
 
     ctx.waitUntil(
       (async () => {
-        const scheduledDate = new Date(controller.scheduledTime);
         try {
-          await ensureMonthlyPlan(env, config, scheduledDate);
-          await postTodayEventsIfNeeded(env, config, scheduledDate, false);
+          await runMonthlyEventAutomation(env, config, {
+            currentDate: new Date(),
+            source: "cron",
+            scheduledAt: controller.scheduledTime
+              ? new Date(controller.scheduledTime).toISOString()
+              : null,
+          });
         } catch (error) {
           console.error("Blad crona:", error);
         }
